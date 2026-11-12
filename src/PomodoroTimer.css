@@ -290,3 +290,7 @@ body {
 .settings-toggle {
   width: 12rem;
 }
+#root {
+  justify-content: flex-start;
+  padding-top: clamp(1.5rem, 5vh, 3rem);
+}
