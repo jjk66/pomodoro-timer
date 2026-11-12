@@ -1,186 +1,215 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import './PomodoroTimer.css';
-
-const MODES = {
-  work: { label: 'Focus Time', minutes: 25 },
-  shortBreak: { label: 'Short Break', minutes: 5 },
-  longBreak: { label: 'Long Break', minutes: 15 },
-};
-
-const SESSIONS_BEFORE_LONG_BREAK = 4;
-
-// Plays a three-note chime using the Web Audio API (no audio file needed)
-function playChime(audioCtx) {
-  if (!audioCtx) return;
-  const now = audioCtx.currentTime;
-
-  [0, 0.4, 0.8].forEach((offset) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-
-    gain.gain.setValueAtTime(0.0001, now + offset);
-    gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.3);
-
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(now + offset);
-    osc.stop(now + offset + 0.35);
-  });
+* {
+  box-sizing: border-box;
 }
 
-function formatTime(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
-export default function PomodoroTimer() {
-  const [mode, setMode] = useState('work');
-  const [secondsLeft, setSecondsLeft] = useState(MODES.work.minutes * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState(0);
-  const [hasStarted, setHasStarted] = useState(false);
+.pomodoro {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  transition: background-color 0.4s ease;
+  background: #c0392b;
+  color: #fff;
+}
 
-  const endTimeRef = useRef(null);   // timestamp (ms) when the current run will finish
-  const audioCtxRef = useRef(null);  // created on a user tap so mobile browsers allow sound
+.pomodoro--shortBreak { background: #2e8b57; }
+.pomodoro--longBreak  { background: #2c6fbb; }
 
-  const totalSeconds = MODES[mode].minutes * 60;
-  const progressPercent = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
-  const sessionsInCycle = completedSessions % SESSIONS_BEFORE_LONG_BREAK;
+.pomodoro__card {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
 
-  // Called when the countdown reaches zero
-  const handleSessionEnd = useCallback(() => {
-    playChime(audioCtxRef.current);
-    setIsRunning(false);
-    setHasStarted(false);
+.pomodoro__mode {
+  margin: 0;
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 
-    if (mode === 'work') {
-      const newCount = completedSessions + 1;
-      const nextMode =
-        newCount % SESSIONS_BEFORE_LONG_BREAK === 0 ? 'longBreak' : 'shortBreak';
-      setCompletedSessions(newCount);
-      setMode(nextMode);
-      setSecondsLeft(MODES[nextMode].minutes * 60);
-    } else {
-      setMode('work');
-      setSecondsLeft(MODES.work.minutes * 60);
-    }
-  }, [mode, completedSessions]);
+.pomodoro__time {
+  font-size: clamp(4rem, 22vw, 7rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
 
-  // Countdown loop based on timestamps, so it stays accurate in background tabs
-  useEffect(() => {
-    if (!isRunning) return;
+.pomodoro__progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
 
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
-      if (remaining <= 0) {
-        handleSessionEnd();
-      } else {
-        setSecondsLeft(remaining);
-      }
-    };
+.pomodoro__progress-fill {
+  height: 100%;
+  background: #fff;
+  transition: width 0.25s linear;
+}
 
-    tick();
-    const intervalId = setInterval(tick, 250);
-    return () => clearInterval(intervalId);
-  }, [isRunning, handleSessionEnd]);
+.pomodoro__controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
-  // Keep the browser tab title in sync with the timer
-  useEffect(() => {
-    document.title = `${formatTime(secondsLeft)} - ${MODES[mode].label}`;
-  }, [secondsLeft, mode]);
+.btn {
+  appearance: none;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  min-width: 130px;
+  min-height: 48px;
+  touch-action: manipulation;
+  transition: transform 0.1s ease, background-color 0.2s ease;
+}
 
-  const handleStart = () => {
-    if (!audioCtxRef.current) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) audioCtxRef.current = new AudioCtx();
-    }
-    audioCtxRef.current?.resume();
+.btn:hover,
+.btn:focus-visible {
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+}
 
-    endTimeRef.current = Date.now() + secondsLeft * 1000;
-    setHasStarted(true);
-    setIsRunning(true);
-  };
+.btn:active {
+  transform: scale(0.97);
+}
 
-  const handlePause = () => {
-    const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
-    setSecondsLeft(remaining);
-    setIsRunning(false);
-  };
+.btn--primary {
+  background: #fff;
+  color: #222;
+}
 
-  const handleResetTimer = () => {
-    setIsRunning(false);
-    setHasStarted(false);
-    setSecondsLeft(MODES[mode].minutes * 60);
-  };
+.btn--primary:hover,
+.btn--primary:focus-visible {
+  background: #f0f0f0;
+}
 
-  const handleResetAll = () => {
-    setIsRunning(false);
-    setHasStarted(false);
-    setMode('work');
-    setSecondsLeft(MODES.work.minutes * 60);
-    setCompletedSessions(0);
-  };
+.btn--link {
+  border: none;
+  min-width: 0;
+  padding: 8px;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  opacity: 0.85;
+}
 
-  let primaryLabel = 'Start';
-  if (isRunning) primaryLabel = 'Pause';
-  else if (hasStarted) primaryLabel = 'Resume';
+.pomodoro__stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
 
-  return (
-    <div className={`pomodoro pomodoro--${mode}`}>
-      <div className="pomodoro__card">
-        <h1 className="pomodoro__mode">{MODES[mode].label}</h1>
+.pomodoro__count-number {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
 
-        <div className="pomodoro__time" role="timer" aria-live="off">
-          {formatTime(secondsLeft)}
-        </div>
+.pomodoro__count-label {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
 
-        <div className="pomodoro__progress" aria-hidden="true">
-          <div
-            className="pomodoro__progress-fill"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+.pomodoro__dots {
+  display: flex;
+  gap: 10px;
+}
 
-        <div className="pomodoro__controls">
-          <button
-            className="btn btn--primary"
-            onClick={isRunning ? handlePause : handleStart}
-          >
-            {primaryLabel}
-          </button>
-          <button className="btn" onClick={handleResetTimer}>
-            Reset Timer
-          </button>
-        </div>
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  transition: background-color 0.3s ease;
+}
 
-        <div className="pomodoro__stats">
-          <div className="pomodoro__count">
-            <span className="pomodoro__count-number">{completedSessions}</span>
-            <span className="pomodoro__count-label">
-              {completedSessions === 1 ? 'session completed' : 'sessions completed'}
-            </span>
-          </div>
+.dot--filled {
+  background: #fff;
+}
 
-          <div className="pomodoro__dots" aria-label={`${sessionsInCycle} of 4 sessions in this cycle`}>
-            {Array.from({ length: SESSIONS_BEFORE_LONG_BREAK }, (_, i) => (
-              <span
-                key={i}
-                className={`dot ${i < sessionsInCycle ? 'dot--filled' : ''}`}
-              />
-            ))}
-          </div>
+@media (max-width: 480px) {
+  .btn {
+    flex: 1 1 140px;
+  }
+}
+.settings {
+  margin-top: clamp(1rem, 3vw, 2rem);
+  text-align: center;
+}
 
-          <button className="btn btn--link" onClick={handleResetAll}>
-            Reset All
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+.link {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+}
+
+.settings-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  max-width: 320px;
+  margin-inline: auto;
+}
+
+.setting {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+}
+
+.setting input {
+  width: 5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.secondary {
+  padding: 0.75rem 1.5rem;
+  font-size: clamp(0.9rem, 2.5vw, 1rem);
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: clamp(1rem, 3vw, 1.5rem);
+}
+
+.controls button {
+  min-width: 12rem;
 }
 /* Dark background and centered layout */
 html,
@@ -260,8 +289,4 @@ body {
 .settings button,
 .settings-toggle {
   width: 12rem;
-}
-#root {
-  justify-content: flex-start;
-  padding-top: clamp(1.5rem, 5vh, 3rem);
 }
